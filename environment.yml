@@ -1,0 +1,9 @@
+name: geohashlib
+channels: !!python/tuple
+- defaults
+dependencies:
+- jupyter
+- pip:
+  - geojson
+  - python-geohash
+  - shapely

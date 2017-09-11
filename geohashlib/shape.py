@@ -1,59 +1,16 @@
+# -*- coding: utf-8 -*-
+"""Functions to translate geohashes to shapes and back
 
-#==============================================================================
+The functions "neighbor" and "shape2geohash" were the two original functions
+in the geohash_shape package by Jonathan Xu. shape2geohash was originally called
+geohash_shape.
 
-import geohash, json
-from geojson import Polygon
-from shapely.geometry import box, Point,mapping, shape
-from shapely.geometry.base import BaseGeometry
+neighbors() was added for convenience and we added geohash2poly
+"""
+import geohash # from python-geohash
+from geojson import Polygon, Point
+from shapely.geometry import box
 
-#==============================================================================
-
-
-# The below four functions were found in the unit test that Jerry Xu provided 
-# in his geohash shape package.
-
-
-class ShapelyEncoder(json.JSONEncoder):
-    """
-    For the purpose of exporting shapes into JSON format.
-    """
-    def default(self, obj):
-        if isinstance(obj, BaseGeometry):
-            return mapping(obj)
-        return json.JSONEncoder.default(self, obj)
-
-
-class ShapelyDecoder(json.JSONDecoder):
-    """
-    Aims to decode json string into shapely shape.
-    """
-    def decode(self, json_string):
-
-        def shapely_object_hook(obj):
-            if 'coordinates' in obj and 'type' in obj:
-                return shape(obj)
-            return obj
-
-        return json.loads(json_string, object_hook=shapely_object_hook)
-
-
-def export_to_JSON(data):
-    """
-    For the purpose of exporting shapes into JSON format.
-    """
-    return json.dumps(data, indent=4, sort_keys=True, cls=ShapelyEncoder)
-
-
-def load_from_JSON(json_string):
-    """
-    Takes input that's in JSON file formatting and converts it into a shape from shapely.
-    """
-    return json.loads(json_string, cls=ShapelyDecoder)
-
-#==============================================================================
-
-# The functions "neighbor" and "geohash_shape" were the two original functions
-# in the geohash_shape package.
 
 def neighbor(geo_hash, direction):
     """
@@ -71,7 +28,13 @@ def neighbor(geo_hash, direction):
     return geohash.encode(neighbor_lat, neighbor_lon, len(geo_hash))
 
 
-def geohash_shape(shape, precision, mode='intersect', threshold=None):
+def neighbors(geo_hash):
+    directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
+    surrounding_geohashes = [neighbor(geo_hash, direc) for direc in directions]
+    return surrounding_geohashes
+
+
+def shape2geohash(shape, precision, mode='intersect', threshold=None):
     """
     Find list of geohashes to cover the shape
     :param shape: shape to cover
@@ -104,8 +67,8 @@ def geohash_shape(shape, precision, mode='intersect', threshold=None):
 
     hash_list = []
 
-    for lat in xrange(0, lat_step + 1):
-        for lon in xrange(0, lon_step + 1):
+    for lat in range(0, lat_step + 1):
+        for lon in range(0, lon_step + 1):
             next_hash = neighbor(hash_south_west, [lat, lon])
             if mode == 'center':
                 (lat_center, lon_center) = geohash.decode(next_hash)
@@ -130,45 +93,34 @@ def geohash_shape(shape, precision, mode='intersect', threshold=None):
     return hash_list
 
 
-    
-#==============================================================================
-    
-# Request #1: Create a function that returns the eight surrounding geohashes.
-
-def neighbors(geo_hash):
-    directions = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]
-    surrounding_geohashes = [neighbor(geo_hash,direc) for direc in directions]
-    return surrounding_geohashes
-    
-    
-#==============================================================================   
-
-
-# Request #2: Create a function called hash2poly that takes a set of geohashes 
-#             and returns a shape.
-
 def _coordinates(geohashes):
     geohashes = [geohash.decode(h) for h in geohashes]
     return geohashes
-    
+
+
 def _corners(geohashes):
     vertices = []
     for geo in geohashes:
-        if (neighbor(geo,[1,0]) in geohashes) and (neighbor(geo,[-1,0]) in geohashes):
+        if (neighbor(geo, [1, 0]) in geohashes) and (neighbor(geo, [-1, 0]) in geohashes):
             pass
-        elif (neighbor(geo,[0,-1]) in geohashes) and (neighbor(geo,[0,1]) in geohashes):
+        elif (neighbor(geo, [0, -1]) in geohashes) and (neighbor(geo, [0, 1]) in geohashes):
             pass
         else:
             vertices.append(geo)
     return vertices
-    
+
+
 def _shape(vert):
     points = _coordinates(vert)
     return Polygon(points)
-    
-def hash2poly(geohashes):
+
+
+def geohash2shape(geohashes):
+    """hash2poly that takes a set of geohashes and returns a shape.
+    :param geohashes
+    :type geohashes: list
+    :return BaseGeometry
+    """
     corners_ = _corners(geohashes)
     shape_ = _shape(corners_)
     return shape_
-    
-#==============================================================================

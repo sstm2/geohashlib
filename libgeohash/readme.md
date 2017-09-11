@@ -1,1 +1,0 @@
-libgeohash folder for package
