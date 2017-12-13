@@ -12,6 +12,17 @@ from geojson import Polygon, Point
 from shapely.geometry import box
 
 
+def remove_duplicates(values):
+    output = []
+    seen = set()
+    for value in values:
+        # If value has not been encountered yet,
+        # ... add it to both list and set.
+        if value not in seen:
+            output.append(value)
+            seen.add(value)
+    return output
+
 def neighbor(geo_hash, direction):
     """
     Find neighbor of a geohash string in certain direction.
@@ -34,7 +45,8 @@ def neighbors(geo_hash):
     return surrounding_geohashes
 
 
-def shape2geohash(shape, precision, mode='intersect', threshold=None):
+def shape2geohash(shape, precision, mode='intersect'):
+    # , threshold = None
     """
     Find list of geohashes to cover the shape
     :param shape: shape to cover
@@ -46,8 +58,8 @@ def shape2geohash(shape, precision, mode='intersect', threshold=None):
                  'inside' - all geohashes inside the shape
                  'center' - all geohashes whose center is inside the shape
     :type mode: str
-    :param threshold: percentage of least coverage
-    :type threshold: float
+    # :param threshold: percentage of least coverage
+    # :type threshold: float
     :return: list of geohashes
     :rtype: list
     """
@@ -72,24 +84,51 @@ def shape2geohash(shape, precision, mode='intersect', threshold=None):
             next_hash = neighbor(hash_south_west, [lat, lon])
             if mode == 'center':
                 (lat_center, lon_center) = geohash.decode(next_hash)
-                if shape.contains(Point(lon_center, lat_center)):
+                if shape.contains(Point(lon_center, lat_center)) is True:
                     hash_list.append(next_hash)
             else:
                 next_bbox = geohash.bbox(next_hash)
                 next_bbox_geom = box(next_bbox['w'], next_bbox['s'], next_bbox['e'], next_bbox['n'])
 
                 if mode == 'inside':
-                    if shape.contains(next_bbox_geom):
-                        hash_list.append(next_hash)
-                elif mode == 'intersect':
-                    if shape.intersects(next_bbox_geom):
-                        if threshold is None:
+                    if shape.type == 'Polygon':
+                        if shape.contains(next_bbox_geom) is True:
                             hash_list.append(next_hash)
-                        else:
-                            intersected_area = shape.intersection(next_bbox_geom).area
-                            if (intersected_area / next_bbox_geom.area) >= threshold:
+                    else:
+                        for poly in range(0, len(list(shape))):
+                            if shape[poly].contains(next_bbox_geom) is True:
                                 hash_list.append(next_hash)
-
+                if mode == 'intersect':
+                    if shape.type == 'Polygon':
+                        if shape.intersects(next_bbox_geom.boundary) is True:
+                            hash_list.append(next_hash)
+                    else:
+                        for poly in range(0, len(list(shape))):
+                            if shape[poly].intersects(next_bbox_geom.boundary) is True:
+                                hash_list.append(next_hash)
+                if mode == 'overlaps':
+                    if shape.type == 'Polygon':
+                        if shape.intersects(next_bbox_geom.boundary) is True:
+                            hash_list.append(next_hash)
+                    else:
+                        for poly in range(0, len(list(shape))):
+                            if shape[poly].intersects(next_bbox_geom.boundary) is True:
+                                hash_list.append(next_hash)
+                elif mode == 'inside or intersects':
+                    if shape.type == 'Polygon':
+                        if shape.overlaps(next_bbox_geom) is True or shape.intersects(next_bbox_geom.boundary) is True:
+                            hash_list.append(next_hash)
+                    else:
+                        for poly in range(0, len(list(shape))):
+                            if shape[poly].overlaps(next_bbox_geom) is True or shape[poly].intersects(next_bbox_geom.boundary) is True:
+                                hash_list.append(next_hash)
+                                # if threshold is None:
+                                #     hash_list.append(next_hash)
+                                # else:
+                                #     intersected_area = shape.intersection(next_bbox_geom).area
+                                #     if (intersected_area / next_bbox_geom.area) >= threshold:
+                                #         hash_list.append(next_hash)
+    hash_list = remove_duplicates(hash_list)
     return hash_list
 
 
